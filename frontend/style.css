@@ -1,0 +1,307 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: #0f172a;
+    color: white;
+}
+
+
+/* Header */
+
+.header {
+    height: 80px;
+    padding: 15px 30px;
+
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    background: #111827;
+    border-bottom: 1px solid #334155;
+}
+
+.header h1 {
+    font-size: 24px;
+}
+
+.header p {
+    color: #94a3b8;
+    margin-top: 5px;
+}
+
+.meeting-status {
+    padding: 8px 15px;
+    background: #1e293b;
+    border-radius: 20px;
+    color: #22c55e;
+}
+
+.status-dot {
+    display: inline-block;
+
+    width: 9px;
+    height: 9px;
+
+    background: #22c55e;
+
+    border-radius: 50%;
+
+    margin-right: 6px;
+}
+
+
+/* Main Container */
+
+.container {
+    padding: 25px;
+}
+
+
+/* Participants */
+
+.participants-section {
+    margin-bottom: 25px;
+}
+
+.participants-section h2 {
+    margin-bottom: 15px;
+}
+
+.participants {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+}
+
+.participant {
+    padding: 20px;
+
+    text-align: center;
+
+    background: #1e293b;
+
+    border-radius: 12px;
+
+    border: 1px solid #334155;
+}
+
+.avatar {
+    width: 55px;
+    height: 55px;
+
+    margin: auto;
+    margin-bottom: 10px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border-radius: 50%;
+
+    background: #2563eb;
+
+    font-size: 22px;
+    font-weight: bold;
+}
+
+.participant p {
+    margin-top: 7px;
+    color: #94a3b8;
+}
+
+
+/* Meeting Area */
+
+.meeting-area {
+    display: grid;
+
+    grid-template-columns: 2fr 1fr;
+
+    gap: 20px;
+}
+
+
+/* Transcript */
+
+.transcript,
+.ai-assistant {
+    background: #1e293b;
+
+    border: 1px solid #334155;
+
+    border-radius: 12px;
+
+    padding: 20px;
+
+    min-height: 350px;
+}
+
+.section-title {
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    margin-bottom: 20px;
+}
+
+.section-title span {
+    color: #22c55e;
+}
+
+.message {
+    padding: 15px;
+
+    margin-bottom: 12px;
+
+    background: #0f172a;
+
+    border-radius: 8px;
+}
+
+.message strong {
+    color: #60a5fa;
+}
+
+.message p {
+    margin-top: 5px;
+
+    color: #cbd5e1;
+}
+
+
+/* AI Assistant */
+
+.ai-assistant h2 {
+    margin-bottom: 20px;
+}
+
+.suggestion-box {
+    padding: 18px;
+
+    background: #172554;
+
+    border: 1px solid #2563eb;
+
+    border-radius: 10px;
+}
+
+.suggestion-box h3 {
+    margin-bottom: 10px;
+}
+
+.suggestion-box p {
+    color: #bfdbfe;
+
+    line-height: 1.5;
+}
+
+.detected-topic {
+    margin-top: 20px;
+
+    padding: 15px;
+
+    background: #0f172a;
+
+    border-radius: 10px;
+}
+
+.detected-topic h3 {
+    margin-bottom: 8px;
+}
+
+.detected-topic p {
+    color: #94a3b8;
+}
+
+
+/* Buttons */
+
+.controls {
+    margin-top: 25px;
+
+    display: flex;
+
+    justify-content: center;
+
+    gap: 15px;
+}
+
+.btn {
+    padding: 12px 20px;
+
+    border: none;
+
+    border-radius: 8px;
+
+    cursor: pointer;
+
+    color: white;
+
+    background: #334155;
+
+    font-size: 15px;
+}
+
+.btn:hover {
+    background: #475569;
+}
+
+.end-btn {
+    background: #dc2626;
+}
+
+.end-btn:hover {
+    background: #b91c1c;
+}
+
+.summary-btn {
+    background: #2563eb;
+}
+
+.task-btn {
+    background: #16a34a;
+}
+
+
+/* Responsive */
+
+@media (max-width: 800px) {
+
+    .participants {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .meeting-area {
+        grid-template-columns: 1fr;
+    }
+
+    .controls {
+        flex-wrap: wrap;
+    }
+}
+
+
+.messages {
+    height: 250px;
+    overflow-y: auto;
+}
+
+#messageInput {
+    width: 300px;
+    padding: 12px;
+
+    border: 1px solid #334155;
+    border-radius: 8px;
+
+    background: #0f172a;
+    color: white;
+
+    outline: none;
+}

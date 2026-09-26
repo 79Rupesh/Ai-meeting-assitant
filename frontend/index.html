@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>AI Meeting Assistant</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <header class="header">
+        <div>
+            <h1>🤖 AI Meeting Assistant</h1>
+            <p>Smart real-time meeting support</p>
+        </div>
+
+        <div class="meeting-status">
+            <span class="status-dot"></span>
+            LIVE
+        </div>
+    </header>
+
+
+    <main class="container">
+
+        <!-- Participants -->
+        <section class="participants-section">
+
+            <h2>Participants</h2>
+
+            <div class="participants">
+
+                <div class="participant">
+                    <div class="avatar">R</div>
+                    <h3>Rupesh</h3>
+                    <p>🎤 Speaking</p>
+                </div>
+
+                <div class="participant">
+                    <div class="avatar">A</div>
+                    <h3>Amit</h3>
+                    <p>🎤 Listening</p>
+                </div>
+
+                <div class="participant">
+                    <div class="avatar">R</div>
+                    <h3>Rahul</h3>
+                    <p>🎤 Listening</p>
+                </div>
+
+                <div class="participant">
+                    <div class="avatar">P</div>
+                    <h3>Priya</h3>
+                    <p>🎤 Listening</p>
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- Meeting Area -->
+        <section class="meeting-area">
+
+            <!-- Live Transcript -->
+            <div class="transcript">
+
+                <div class="section-title">
+                    <h2>📝 Live Transcript</h2>
+                    <span>Live</span>
+                </div>
+
+                <div class="messages">
+
+                    <div class="message">
+                        <strong>Amit:</strong>
+                        <p>What is Artificial Intelligence?</p>
+                    </div>
+
+                    <div class="message">
+                        <strong>Rupesh:</strong>
+                        <p>
+                            Artificial Intelligence is a technology
+                            that enables machines to perform intelligent tasks.
+                        </p>
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- AI Assistant -->
+            <div class="ai-assistant">
+
+                <h2>🤖 AI Assistant</h2>
+
+                <div class="suggestion-box">
+
+                    <h3>💡 AI Suggestion</h3>
+
+                    <p>
+                        Explain the concept with a simple
+                        real-world example.
+                    </p>
+
+                </div>
+
+                <div class="detected-topic">
+
+                    <h3>🔍 Detected Topic</h3>
+
+                    <p>Artificial Intelligence</p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- Controls -->
+        <section class="controls">
+
+            <button class="btn mute-btn">
+                🎤 Mute
+            </button>
+
+            <button class="btn end-btn">
+                🔴 End Meeting
+            </button>
+
+            <button class="btn summary-btn">
+                📋 Summary
+            </button>
+
+            <button class="btn task-btn">
+                ✅ Action Items
+            </button>
+
+        </section>
+
+    </main>
+
+
+    <script src="js/meeting.js"></script>
+
+</body>
+</html>

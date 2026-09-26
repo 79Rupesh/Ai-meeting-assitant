@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Meeting Room</title>
+
+    <link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+
+    <header class="header">
+
+        <div>
+            <h1>🤖 AI Meeting Assistant</h1>
+            <p>Real-Time Meeting Room</p>
+        </div>
+
+        <div class="meeting-status">
+            <span class="status-dot"></span>
+            LIVE
+        </div>
+
+    </header>
+
+
+    <main class="container">
+
+        <!-- Participants -->
+
+        <section class="participants-section">
+
+            <h2>👥 Participants</h2>
+
+            <div id="participants" class="participants">
+                <!-- Participants will appear here -->
+            </div>
+
+        </section>
+
+
+        <!-- Meeting Area -->
+
+        <section class="meeting-area">
+
+            <!-- Transcript -->
+
+            <div class="transcript">
+
+                <div class="section-title">
+
+                    <h2>📝 Live Transcript</h2>
+
+                    <span id="onlineCount">
+                        0 Online
+                    </span>
+
+                </div>
+
+
+                <div id="messages" class="messages">
+                </div>
+
+            </div>
+
+
+            <!-- AI Assistant -->
+
+            <div class="ai-assistant">
+
+                <h2>🤖 AI Assistant</h2>
+
+                <div class="suggestion-box">
+
+                    <h3>💡 AI Suggestion</h3>
+
+                    <p id="aiSuggestion">
+                        Waiting for conversation...
+                    </p>
+
+                </div>
+
+
+                <div class="detected-topic">
+
+                    <h3>🔍 Detected Topic</h3>
+
+                    <p id="topic">
+                        No topic detected
+                    </p>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- Message Box -->
+
+        <section class="controls">
+
+            <input type="text" id="messageInput" placeholder="Type your message...">
+
+            <button class="btn summary-btn" onclick="sendMessage()">
+                Send
+            </button>
+
+            <section class="controls">
+
+                <button class="btn" onclick="startListening()">
+                    🎤 Start Speaking
+                </button>
+
+                <input type="text" id="messageInput" placeholder="Type or speak...">
+
+                <button class="btn summary-btn" onclick="sendMessage()">
+                    Send
+                </button>
+
+                <button class="btn end-btn" onclick="leaveMeeting()">
+                    🔴 Leave Meeting
+                </button>
+
+                <button class="btn summary-btn" onclick="getSummary()">
+                    📋 Summary
+                </button>
+
+            </section>
+
+        </section>
+
+    </main>
+
+
+    <script src="js/meeting.js"></script>
+
+</body>
+
+</html>
