@@ -77,7 +77,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
                 ai_result = analyze_message(message)
 
-                await websocket.send_json({
+                await broadcast({
                     "type": "ai_suggestion",
                     "suggestion": ai_result["suggestion"],
                     "topic": ai_result["topic"],
