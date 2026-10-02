@@ -2,83 +2,203 @@
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
-
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Meeting Room</title>
+    <title>AI Meeting Companion</title>
 
-    <link rel="stylesheet" href="style.css">
-
+    <link rel="stylesheet" href="/frontend/style.css">
 </head>
 
 <body>
 
-    <header class="header">
+    <!-- =========================
+         COMPACT MEETING WINDOW
+    ========================== -->
 
-        <div>
-            <h1>🤖 AI Meeting Assistant</h1>
-            <p>Real-Time Meeting Room</p>
+    <div class="meeting-window">
+
+        <!-- HEADER -->
+        <header class="compact-header">
+
+            <div class="brand">
+                <div class="brand-icon">🤖</div>
+
+                <div class="brand-text">
+                    <h1>AI Meeting</h1>
+                    <span>Meeting Companion</span>
+                </div>
+            </div>
+
+            <div class="header-actions">
+
+                <button class="menu-btn" onclick="toggleMenu()" title="Menu">
+                    ⋮
+                </button>
+
+                <div class="window-dot"></div>
+
+                <button class="close-btn" onclick="leaveMeeting()" title="Leave Meeting">
+                    ×
+                </button>
+
+            </div>
+
+        </header>
+
+
+        <!-- =================================
+     THREE DOT MENU
+================================= -->
+
+        <div id="meetingMenu" class="meeting-menu">
+
+            <button onclick="openHistoryFromMenu()">
+                🕘 Meeting History
+            </button>
+
+            <button onclick="getSummary(); closeMenu()">
+                📋 Summary
+            </button>
+
+            <button onclick="showActionItems(); closeMenu()">
+                ✅ Action Items
+            </button>
+
+            <button onclick="showDetectedTopic(); closeMenu()">
+                🔍 Topic
+            </button>
+
+            <div class="menu-divider"></div>
+
+            <button class="menu-leave" onclick="leaveFromMenu()">
+                🔴 Leave Meeting
+            </button>
+
         </div>
 
-        <div class="meeting-status">
-            <span class="status-dot"></span>
-            LIVE
+
+        <!-- =========================
+             MEETING INFO
+        ========================== -->
+
+        <div class="meeting-info">
+
+            <div class="live-status">
+                <span class="status-dot"></span>
+                LIVE
+            </div>
+
+            <span id="onlineCount">
+                0 Online
+            </span>
+
         </div>
 
-    </header>
 
-
-    <main class="container">
-
-        <!-- Participants -->
+        <!-- =========================
+             PARTICIPANTS
+        ========================== -->
 
         <section class="participants-section">
 
-            <h2>👥 Participants</h2>
+            <div class="section-heading">
+
+                <h2>👥 Participants</h2>
+
+                <span class="section-label">
+                    Online
+                </span>
+
+            </div>
 
             <div id="participants" class="participants">
-                <!-- Participants will appear here -->
             </div>
 
         </section>
 
 
-        <!-- Meeting Area -->
+        <!-- =========================
+             MAIN CONTENT
+        ========================== -->
 
-        <section class="meeting-area">
+        <div class="main-content">
 
-            <!-- Transcript -->
 
-            <div class="transcript">
+            <!-- =====================
+                 LIVE TRANSCRIPT
+            ====================== -->
 
-                <div class="section-title">
+            <section class="transcript card">
 
-                    <h2>📝 Live Transcript</h2>
+                <div class="card-header">
 
-                    <span id="onlineCount">
-                        0 Online
+                    <h2>💬 Live Transcript</h2>
+
+                    <span class="live-text">
+                        ● Live
+                    </span>
+
+                </div>
+
+                <div id="messages" class="messages">
+                </div>
+
+            </section>
+
+
+            <!-- =====================
+                 AI ASSISTANT
+            ====================== -->
+
+            <section class="ai-assistant card">
+
+                <div class="card-header">
+
+                    <h2>✨ AI Assistant</h2>
+
+                    <span class="ai-status">
+                        AI
                     </span>
 
                 </div>
 
 
-                <div id="messages" class="messages">
+                <!-- QUESTION -->
+                <div class="ai-item question-item">
+
+                    <div class="ai-label">
+                        ❓ Question
+                    </div>
+
+                    <p id="questionDetected">
+                        Waiting for conversation...
+                    </p>
+
                 </div>
 
-            </div>
 
 
-            <!-- AI Assistant -->
+                <!-- ANSWER -->
+                <div class="ai-item answer-item">
 
-            <div class="ai-assistant">
+                    <div class="ai-label">
+                        🤖 AI Answer
+                    </div>
 
-                <h2>🤖 AI Assistant</h2>
+                    <p id="aiAnswer">
+                        Waiting for question...
+                    </p>
 
-                <div class="suggestion-box">
+                </div>
 
-                    <h3>💡 AI Suggestion</h3>
+
+                <!-- SUGGESTION -->
+                <div class="ai-item suggestion-item">
+
+                    <div class="ai-label">
+                        💡 Suggestion
+                    </div>
 
                     <p id="aiSuggestion">
                         Waiting for conversation...
@@ -87,59 +207,67 @@
                 </div>
 
 
-                <div class="detected-topic">
+                <!-- TOPIC -->
+                <div class="ai-topic">
 
-                    <h3>🔍 Detected Topic</h3>
+                    <span>
+                        🔍 Topic
+                    </span>
 
-                    <p id="topic">
+                    <strong id="topic">
                         No topic detected
-                    </p>
+                    </strong>
 
                 </div>
 
-            </div>
-
-        </section>
-
-
-        <!-- Message Box -->
-
-        <section class="controls">
-
-            <input type="text" id="messageInput" placeholder="Type your message...">
-
-            <button class="btn summary-btn" onclick="sendMessage()">
-                Send
-            </button>
-
-            <section class="controls">
-
-                <button class="btn" onclick="startListening()">
-                    🎤 Start Speaking
-                </button>
-
-                <input type="text" id="messageInput" placeholder="Type or speak...">
-
-                <button class="btn summary-btn" onclick="sendMessage()">
-                    Send
-                </button>
-
-                <button class="btn end-btn" onclick="leaveMeeting()">
-                    🔴 Leave Meeting
-                </button>
-
-                <button class="btn summary-btn" onclick="getSummary()">
-                    📋 Summary
-                </button>
-
             </section>
 
-        </section>
-
-    </main>
+        </div>
 
 
-    <script src="js/meeting.js"></script>
+
+
+
+        <!-- =========================
+             MESSAGE INPUT
+        ========================== -->
+
+        <div class="message-area">
+
+            <input type="text" id="messageInput" placeholder="Type message..." onkeydown="handleEnter(event)"
+                autocomplete="off">
+
+
+            <!-- SPEAKING -->
+            <button id="speechButton" class="icon-btn microphone-btn" onclick="togglePythonSpeaking()"
+                title="Start Speaking">
+                🎤
+            </button>
+
+
+            <!-- SEND -->
+            <button class="icon-btn send-btn" onclick="sendMessage()" title="Send Message">
+                ➤
+            </button>
+
+        </div>
+
+
+        <!-- SPEECH STATUS -->
+
+        <div id="speechStatus" class="speech-status" aria-live="polite">
+
+            Ready for authorized microphone input.
+
+        </div>
+
+
+    </div>
+
+
+    <!-- JAVASCRIPT -->
+
+    <script src="/frontend/js/meeting.js"></script>
 
 </body>
 

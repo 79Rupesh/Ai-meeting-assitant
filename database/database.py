@@ -1,5 +1,6 @@
 import sqlite3
 from pathlib import Path
+from datetime import datetime
 
 
 DATABASE_PATH = Path(__file__).parent / "meeting_assistant.db"
@@ -56,9 +57,15 @@ def create_meeting(title="AI Meeting"):
     connection = get_connection()
     cursor = connection.cursor()
 
+    # India local time
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     cursor.execute(
-        "INSERT INTO meetings (title) VALUES (?)",
-        (title,)
+        """
+        INSERT INTO meetings (title, created_at)
+        VALUES (?, ?)
+        """,
+        (title, created_at)
     )
 
     meeting_id = cursor.lastrowid
@@ -96,14 +103,16 @@ def save_message(meeting_id, user_id, message):
     connection = get_connection()
     cursor = connection.cursor()
 
-    cursor.execute("""
-        INSERT INTO transcript_messages (
-            meeting_id,
-            user_id,
-            message
-        )
-        VALUES (?, ?, ?)
-    """, (meeting_id, user_id, message))
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    cursor.execute(
+        """
+        INSERT INTO transcript_messages
+        (meeting_id, user_id, message, created_at)
+        VALUES (?, ?, ?, ?)
+        """,
+        (meeting_id, user_id, message, created_at)
+    )
 
     connection.commit()
     connection.close()

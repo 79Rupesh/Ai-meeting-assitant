@@ -1,56 +1,81 @@
 let socket;
 
+let username =
+    sessionStorage.getItem("meetingUsername") ||
+    prompt("Enter your name:") ||
+    "Guest";
 
-let username = sessionStorage.getItem(
-    "meetingUsername"
-);
+sessionStorage.setItem("meetingUsername", username);
 
-if (!username) {
 
-    username = prompt("Enter your name:");
+// ======================================================
+// WEBSOCKET CONNECTION
+// ======================================================
 
-    if (!username) {
+function connect() {
 
-        username = "Guest";
+    socket = new WebSocket("ws://127.0.0.1:8000/ws");
 
-    }
+    socket.onopen = function () {
 
-    sessionStorage.setItem(
-        "meetingUsername",
-        username
-    );
+        console.log("✅ Connected to meeting server");
 
+        socket.send(username);
+
+        setSpeechStatus(
+            "idle",
+            "Meeting connection is ready."
+        );
+    };
+
+
+    socket.onmessage = function (event) {
+
+        const data = JSON.parse(event.data);
+
+        console.log("Server message:", data);
+
+        handleServerMessage(data);
+    };
+
+
+    socket.onclose = function () {
+
+        console.log("❌ WebSocket disconnected");
+
+        setSpeechStatus(
+            "idle",
+            "Disconnected from meeting server."
+        );
+    };
+
+
+    socket.onerror = function (error) {
+
+        console.log("WebSocket error:", error);
+
+        setSpeechStatus(
+            "idle",
+            "Unable to connect to the meeting server."
+        );
+    };
 }
 
 
-// Create WebSocket connection
+// ======================================================
+// SERVER MESSAGE
+// ======================================================
 
-socket = new WebSocket("ws://127.0.0.1:8000/ws");
+function handleServerMessage(data) {
 
+    if (data.type === "message") {
 
-// When connection opens
+        addMessage(
+            data.username,
+            data.message
+        );
+    }
 
-socket.onopen = function () {
-
-    console.log("Connected to meeting server");
-
-    // Send username to backend
-
-    socket.send(username);
-
-};
-
-
-// Receive message
-
-socket.onmessage = function (event) {
-
-    const data = JSON.parse(event.data);
-
-    console.log(data);
-
-
-    // User joined
 
     if (data.type === "join") {
 
@@ -63,32 +88,13 @@ socket.onmessage = function (event) {
             data.online_users
         );
 
-    }
-    else if (data.type === "ai_suggestion") {
-
-    showAISuggestion(
-        data.suggestion,
-        data.topic
-    );
-
-}
-
-
-    // Normal message
-
-    else if (data.type === "message") {
-
-        addMessage(
-            data.username,
-            data.message
+        updateParticipant(
+            data.username
         );
-
     }
 
 
-    // User left
-
-    else if (data.type === "leave") {
+    if (data.type === "leave") {
 
         addMessage(
             "System",
@@ -98,200 +104,1130 @@ socket.onmessage = function (event) {
         updateOnlineUsers(
             data.online_users
         );
-
     }
 
-};
+
+    if (data.type === "ai_suggestion") {
+
+        showAIResult(data);
+    }
+}
 
 
-// Add message to transcript
+// ======================================================
+// ADD MESSAGE TO LIVE TRANSCRIPT
+// ======================================================
 
-function addMessage(username, message) {
+function addMessage(author, message) {
 
     const messages =
         document.getElementById("messages");
 
+    if (!messages) {
+        return;
+    }
 
-    const messageDiv =
+
+    const box =
         document.createElement("div");
 
-
-    messageDiv.className = "message";
-
-
-    messageDiv.innerHTML = `
-        <strong>${username}:</strong>
-        <p>${message}</p>
-    `;
+    box.className = "message";
 
 
-    messages.appendChild(messageDiv);
+    const name =
+        document.createElement("strong");
+
+    name.textContent =
+        `${author}:`;
 
 
-    // Scroll to latest message
+    const text =
+        document.createElement("p");
+
+    text.textContent =
+        message;
+
+
+    box.appendChild(name);
+
+    box.appendChild(text);
+
+    messages.appendChild(box);
+
 
     messages.scrollTop =
         messages.scrollHeight;
-
 }
 
 
-// Update online users
+// ======================================================
+// AI RESULT
+// ======================================================
+
+function showAIResult(data) {
+
+    const suggestion =
+        document.getElementById("aiSuggestion");
+
+    const answer =
+        document.getElementById("aiAnswer");
+
+    const topic =
+        document.getElementById("topic");
+
+    const question =
+        document.getElementById("questionDetected");
+
+
+    if (suggestion) {
+
+        suggestion.textContent =
+            data.suggestion ||
+            "No suggestion available.";
+    }
+
+
+    if (answer) {
+
+        answer.textContent =
+            data.answer ||
+            "No answer available.";
+    }
+
+
+    if (topic) {
+
+        topic.textContent =
+            data.topic ||
+            "General Discussion";
+    }
+
+
+    if (question) {
+
+        question.textContent =
+            data.is_question
+                ? "Yes"
+                : "No";
+    }
+}
+
+
+// ======================================================
+// ONLINE USERS
+// ======================================================
 
 function updateOnlineUsers(count) {
 
-    document.getElementById(
-        "onlineCount"
-    ).innerText = `${count} Online`;
+    const onlineCount =
+        document.getElementById("onlineCount");
 
+    if (onlineCount) {
+
+        onlineCount.textContent =
+            `${count} Online`;
+    }
 }
 
 
-// Send message
+// ======================================================
+// PARTICIPANT
+// ======================================================
+
+function updateParticipant(name) {
+
+    const id =
+        `participant-${name}`;
+
+    if (document.getElementById(id)) {
+        return;
+    }
+
+
+    const participant =
+        document.createElement("div");
+
+    participant.className =
+        "participant";
+
+    participant.id =
+        id;
+
+
+    participant.innerHTML = `
+        <div class="avatar"></div>
+        <h3></h3>
+        <p>Online</p>
+    `;
+
+
+    participant
+        .querySelector(".avatar")
+        .textContent =
+        name.charAt(0).toUpperCase();
+
+
+    participant
+        .querySelector("h3")
+        .textContent =
+        name;
+
+
+    const participants =
+        document.getElementById(
+            "participants"
+        );
+
+
+    if (participants) {
+
+        participants.appendChild(
+            participant
+        );
+    }
+}
+
+
+// ======================================================
+// CHECK WEBSOCKET
+// ======================================================
+
+function isMeetingConnected() {
+
+    return (
+        socket &&
+        socket.readyState === WebSocket.OPEN
+    );
+}
+
+
+// ======================================================
+// SEND TEXT TO MEETING
+// ======================================================
+
+function sendTextToMeeting(message) {
+
+    if (!message) {
+
+        return false;
+    }
+
+
+    if (!isMeetingConnected()) {
+
+        console.log(
+            "WebSocket is not ready."
+        );
+
+
+        setSpeechStatus(
+            "idle",
+            "Meeting connection is not ready."
+        );
+
+        return false;
+    }
+
+
+    console.log(
+        "Sending meeting message:",
+        message
+    );
+
+
+    socket.send(message);
+
+    return true;
+}
+
+
+// ======================================================
+// SEND MANUAL MESSAGE
+// ======================================================
 
 function sendMessage() {
 
     const input =
-        document.getElementById("messageInput");
+        document.getElementById(
+            "messageInput"
+        );
+
+
+    if (!input) {
+        return;
+    }
 
 
     const message =
         input.value.trim();
 
 
-    if (message === "") {
-
-        return;
-
-    }
-
-
-    if (socket.readyState === WebSocket.OPEN) {
-
-        socket.send(message);
+    if (
+        sendTextToMeeting(message)
+    ) {
 
         input.value = "";
-
     }
-
 }
 
 
-// Leave meeting
+// ======================================================
+// ENTER KEY
+// ======================================================
+
+function handleEnter(event) {
+
+    if (event.key === "Enter") {
+
+        sendMessage();
+    }
+}
+
+
+// ======================================================
+// PYTHON SPEECH
+// ======================================================
+// ======================================================
+// CONTINUOUS SPEECH CONTROL
+// ======================================================
+
+let speechActive = false;
+
+
+// ======================================================
+// START / STOP TOGGLE
+// ======================================================
+
+function togglePythonSpeaking() {
+
+    if (speechActive) {
+
+        stopPythonSpeaking();
+
+    } else {
+
+        startPythonSpeaking();
+    }
+}
+
+
+// ======================================================
+// START PYTHON SPEECH
+// ======================================================
+
+function startPythonSpeaking() {
+
+    if (!isMeetingConnected()) {
+
+        setSpeechStatus(
+            "idle",
+            "Please wait. Meeting connection is not ready."
+        );
+
+        return;
+    }
+
+
+    if (
+        !window.pywebview ||
+        !window.pywebview.api
+    ) {
+
+        setSpeechStatus(
+            "idle",
+            "Python microphone is available only in the desktop companion."
+        );
+
+        return;
+    }
+
+
+    console.log(
+        "🎤 Starting continuous microphone..."
+    );
+
+
+    speechActive = true;
+
+
+    setSpeechStatus(
+        "listening",
+        "Listening continuously… speak normally."
+    );
+
+
+    window.pywebview.api
+        .start_speaking()
+
+        .then(function(result) {
+
+            console.log(
+                "Python speech result:",
+                result
+            );
+
+
+            if (
+                result &&
+                result.started === false
+            ) {
+
+                speechActive = false;
+
+                setSpeechStatus(
+                    "idle",
+                    result.message ||
+                    "Unable to start microphone."
+                );
+            }
+
+        })
+
+        .catch(function(error) {
+
+            console.error(
+                "Python speech error:",
+                error
+            );
+
+
+            speechActive = false;
+
+
+            setSpeechStatus(
+                "idle",
+                "Unable to start microphone input."
+            );
+        });
+}
+
+
+// ======================================================
+// STOP PYTHON SPEECH
+// ======================================================
+
+function stopPythonSpeaking() {
+
+    if (
+        !window.pywebview ||
+        !window.pywebview.api
+    ) {
+
+        return;
+    }
+
+
+    console.log(
+        "⏹ Stopping continuous microphone..."
+    );
+
+
+    speechActive = false;
+
+
+    window.pywebview.api
+        .stop_speaking()
+
+        .then(function(result) {
+
+            console.log(
+                "Python stop result:",
+                result
+            );
+
+
+            setSpeechStatus(
+                "idle",
+                "Microphone stopped."
+            );
+
+        })
+
+        .catch(function(error) {
+
+            console.error(
+                "Python stop error:",
+                error
+            );
+
+
+            setSpeechStatus(
+                "idle",
+                "Microphone stopped."
+            );
+        });
+}
+
+
+// ======================================================
+// RECEIVE SPEECH FROM PYTHON
+// ======================================================
+
+function receiveSpeechTranscript(text) {
+
+    console.log(
+        "🎤 Speech chunk received:",
+        text
+    );
+
+
+    if (!text || !text.trim()) {
+
+        return;
+    }
+
+
+    /*
+     * Send every speech chunk through
+     * the existing WebSocket.
+     */
+
+    if (
+        sendTextToMeeting(
+            text.trim()
+        )
+    ) {
+
+        /*
+         * Keep listening state.
+         * Do NOT change the button back to
+         * Start Speaking after every chunk.
+         */
+
+        setSpeechStatus(
+            "listening",
+            "Listening continuously…"
+        );
+    }
+}
+
+
+// ======================================================
+// SPEECH STATUS
+// ======================================================
+function setSpeechStatus(state, message) {
+
+    const status = document.getElementById("speechStatus");
+    const button = document.getElementById("speechButton");
+
+    // Status message
+    if (status) {
+        status.textContent = message || "";
+    }
+
+    if (!button) {
+        return;
+    }
+
+    // Processing
+    if (state === "processing") {
+
+        button.textContent = "⏳";
+        button.title = "Processing speech...";
+        button.disabled = true;
+
+        return;
+    }
+
+    // Listening
+    if (speechActive) {
+
+        button.textContent = "⏹";
+        button.title = "Stop Speaking";
+        button.disabled = false;
+
+        return;
+    }
+
+    // Ready / Stopped
+    button.textContent = "🎤";
+    button.title = "Start Speaking";
+    button.disabled = false;
+}
+
+// ======================================================
+// SUMMARY
+// ======================================================
+
+async function getSummary() {
+
+    try {
+
+        const response =
+            await fetch(
+                "http://127.0.0.1:8000/meeting/summary",
+                {
+                    method: "POST"
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        alert(data.summary);
+
+    } catch (error) {
+
+        console.error(
+            "Summary error:",
+            error
+        );
+
+
+        alert(
+            "Unable to generate meeting summary."
+        );
+    }
+}
+
+
+// ======================================================
+// LEAVE MEETING
+// ======================================================
 
 function leaveMeeting() {
 
     if (socket) {
 
         socket.close();
-
     }
 
-    window.location.href = "index.html";
 
+    sessionStorage.removeItem(
+        "meetingUsername"
+    );
+
+
+    window.location.href =
+        "index.html";
 }
 
 
-function showAISuggestion(suggestion, topic) {
+// ======================================================
+// MEETING HISTORY
+// ======================================================
 
-    document.getElementById(
-        "aiSuggestion"
-    ).innerText = suggestion;
+async function loadMeetingHistory() {
 
-
-    document.getElementById(
-        "topic"
-    ).innerText = topic;
-
-}
-
-
-// Speech Recognition
-
-const SpeechRecognition =
-    window.SpeechRecognition ||
-    window.webkitSpeechRecognition;
-
-
-let recognition;
-
-
-if (SpeechRecognition) {
-
-    recognition = new SpeechRecognition();
-
-    recognition.continuous = false;
-
-    recognition.interimResults = false;
-
-    recognition.lang = "en-US";
-
-
-    recognition.onresult = function(event) {
-
-        const transcript =
-            event.results[0][0].transcript;
-
-
+    const history =
         document.getElementById(
-            "messageInput"
-        ).value = transcript;
-
-    };
-
-
-    recognition.onerror = function(event) {
-
-        console.log(
-            "Speech recognition error:",
-            event.error
+            "meetingHistory"
         );
 
-    };
 
+    if (!history) {
+        return;
+    }
+
+
+    try {
+
+        const response =
+            await fetch(
+                "http://127.0.0.1:8000/meetings"
+            );
+
+
+        const data =
+            await response.json();
+
+
+        history.replaceChildren();
+
+
+        if (!data.meetings.length) {
+
+            history.textContent =
+                "No meetings found.";
+
+            return;
+        }
+
+
+        data.meetings.forEach(
+            function(meeting) {
+
+                const card =
+                    document.createElement(
+                        "div"
+                    );
+
+
+                card.className =
+                    "meeting-card";
+
+
+                card.innerHTML = `
+                    <div>
+                        <h3></h3>
+                        <p></p>
+                        <p></p>
+                    </div>
+
+                    <button>
+                        View Meeting
+                    </button>
+                `;
+
+
+                card.querySelector(
+                    "h3"
+                ).textContent =
+                    meeting.title;
+
+
+                card.querySelectorAll(
+                    "p"
+                )[0].textContent =
+                    `Meeting ID: ${meeting.id}`;
+
+
+                card.querySelectorAll(
+                    "p"
+                )[1].textContent =
+                    meeting.created_at;
+
+
+                card.querySelector(
+                    "button"
+                ).onclick =
+                    function() {
+
+                        viewMeeting(
+                            meeting.id
+                        );
+                    };
+
+
+                history.appendChild(
+                    card
+                );
+            }
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Meeting history error:",
+            error
+        );
+
+
+        history.textContent =
+            "Unable to load meeting history.";
+    }
 }
 
 
-function startListening() {
+// ======================================================
+// VIEW MEETING
+// ======================================================
 
-    if (!recognition) {
+async function viewMeeting(id) {
+
+    try {
+
+        const response =
+            await fetch(
+                `http://127.0.0.1:8000/meetings/${id}`
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (data.error) {
+
+            alert(data.error);
+
+            return;
+        }
+
+
+        sessionStorage.setItem(
+            "selectedMeeting",
+            JSON.stringify(data)
+        );
+
+
+        window.location.href =
+            "meeting-history.html";
+
+    } catch (error) {
+
+        console.error(
+            "Meeting details error:",
+            error
+        );
+
 
         alert(
-            "Speech recognition is not supported in this browser."
+            "Unable to load meeting details."
         );
-
-        return;
-
     }
-
-
-    recognition.start();
-
 }
 
 
+// ======================================================
+// START
+// ======================================================
 
-async function getSummary() {
+connect();
+
+
+if (
+    document.getElementById(
+        "meetingHistory"
+    )
+) {
+
+    loadMeetingHistory();
+}
+
+/* =========================================
+   COMPACT MEETING HISTORY
+========================================= */
+
+async function toggleMeetingHistory() {
+
+    let panel = document.getElementById("historyOverlay");
+
+    // If history is already open, close it
+    if (panel) {
+        panel.remove();
+        return;
+    }
+
+    // Create history overlay
+    panel = document.createElement("div");
+
+    panel.id = "historyOverlay";
+    panel.className = "history-overlay";
+
+    panel.innerHTML = `
+        <div class="history-topbar">
+
+            <div>
+                <h2>🕘 Meeting History</h2>
+                <span>Previous meetings</span>
+            </div>
+
+            <button
+                class="history-close-btn"
+                onclick="toggleMeetingHistory()">
+                ×
+            </button>
+
+        </div>
+
+        <div
+            id="compactMeetingHistory"
+            class="compact-meeting-history">
+
+            <div class="history-loading">
+                Loading meetings...
+            </div>
+
+        </div>
+
+        <button
+            class="back-meeting-btn"
+            onclick="toggleMeetingHistory()">
+
+            ← Back to Meeting
+
+        </button>
+    `;
+
+    // Put overlay directly inside the main compact window
+    const meetingWindow =
+        document.querySelector(".meeting-window");
+
+    if (!meetingWindow) {
+        console.error("Meeting window not found.");
+        return;
+    }
+
+    meetingWindow.appendChild(panel);
+
+    // Load meetings
+    await loadCompactMeetingHistory();
+}
+
+
+/* =========================================
+   LOAD MEETING HISTORY
+========================================= */
+
+async function loadCompactMeetingHistory() {
+
+    const history =
+        document.getElementById(
+            "compactMeetingHistory"
+        );
+
+    if (!history) {
+        return;
+    }
 
     try {
 
         const response = await fetch(
-            "http://127.0.0.1:8000/meeting/summary",
-            {
-                method: "POST"
-            }
+            "http://127.0.0.1:8000/meetings"
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                "Failed to load meetings"
+            );
+        }
+
+        const data = await response.json();
+
+        history.replaceChildren();
+
+        if (
+            !data.meetings ||
+            data.meetings.length === 0
+        ) {
+
+            const empty =
+                document.createElement("div");
+
+            empty.className =
+                "history-empty";
+
+            empty.textContent =
+                "No meetings found.";
+
+            history.appendChild(empty);
+
+            return;
+        }
+
+        data.meetings.forEach(function (meeting) {
+
+            const card =
+                document.createElement("div");
+
+            card.className =
+                "compact-history-card";
+
+
+            /* Meeting information */
+
+            const info =
+                document.createElement("div");
+
+            info.className =
+                "history-card-info";
+
+
+            const title =
+                document.createElement("h3");
+
+            title.textContent =
+                meeting.title ||
+                "AI Meeting";
+
+
+            const meetingId =
+                document.createElement("p");
+
+            meetingId.textContent =
+                `Meeting ID: ${meeting.id}`;
+
+
+            const time =
+                document.createElement("p");
+
+            time.textContent =
+                meeting.created_at ||
+                "Time unavailable";
+
+
+            info.appendChild(title);
+            info.appendChild(meetingId);
+            info.appendChild(time);
+
+
+            /* View button */
+
+            const viewButton =
+                document.createElement("button");
+
+            viewButton.className =
+                "view-history-btn";
+
+            viewButton.textContent =
+                "View →";
+
+
+            viewButton.onclick =
+                function () {
+
+                    viewCompactMeeting(
+                        meeting.id
+                    );
+
+                };
+
+
+            card.appendChild(info);
+
+            card.appendChild(viewButton);
+
+            history.appendChild(card);
+
+        });
+
+    } catch (error) {
+
+        console.error(
+            "Meeting history error:",
+            error
+        );
+
+        history.innerHTML = `
+            <div class="history-error">
+                Unable to load meeting history.
+            </div>
+        `;
+    }
+}
+
+
+/* =========================================
+   VIEW SELECTED MEETING
+========================================= */
+
+async function viewCompactMeeting(meetingId) {
+
+    try {
+
+        const response = await fetch(
+            `http://127.0.0.1:8000/meetings/${meetingId}`
         );
 
         const data = await response.json();
 
-        alert(data.summary);
+        if (data.error) {
 
+            alert(data.error);
+
+            return;
+        }
+
+        sessionStorage.setItem(
+            "selectedMeeting",
+            JSON.stringify(data)
+        );
+
+        window.location.href =
+            "meeting-history.html";
+
+    } catch (error) {
+
+        console.error(
+            "Meeting details error:",
+            error
+        );
+
+        alert(
+            "Unable to load meeting details."
+        );
+    }
+}
+
+
+/* =========================================
+   THREE DOT MENU
+========================================= */
+
+function toggleMenu() {
+
+    const menu =
+        document.getElementById("meetingMenu");
+
+    if (!menu) {
+        return;
     }
 
-    catch (error) {
+    menu.classList.toggle("active");
+}
 
-        console.log("Summary error:", error);
+
+function closeMenu() {
+
+    const menu =
+        document.getElementById("meetingMenu");
+
+    if (menu) {
+
+        menu.classList.remove("active");
 
     }
+}
+
+
+/* =========================================
+   HISTORY
+========================================= */
+
+function openHistoryFromMenu() {
+
+    closeMenu();
+
+    toggleMeetingHistory();
+
+}
+
+
+/* =========================================
+   ACTION ITEMS
+========================================= */
+
+function showActionItems() {
+
+    alert(
+        "Action Items feature will be added next."
+    );
+
+}
+
+
+/* =========================================
+   TOPIC
+========================================= */
+
+function showDetectedTopic() {
+
+    const topic =
+        document.getElementById("topic");
+
+    const value =
+        topic
+            ? topic.textContent.trim()
+            : "No topic detected";
+
+    alert(
+        "Detected Topic:\n\n" + value
+    );
+
+}
+
+
+/* =========================================
+   LEAVE
+========================================= */
+
+function leaveFromMenu() {
+
+    closeMenu();
+
+    leaveMeeting();
 
 }

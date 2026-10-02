@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,83 @@
     <title>AI Meeting Assistant</title>
 
     <link rel="stylesheet" href="style.css">
+
+
+    <style>
+        /* Meeting History */
+
+        .meeting-history {
+            margin-bottom: 30px;
+        }
+
+        .meeting-history .section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 18px;
+        }
+
+        .meeting-history h2 {
+            color: #f8fafc;
+            margin: 0;
+        }
+
+        #meetingHistory {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .meeting-card {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            padding: 16px 18px;
+
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+
+            transition: all 0.2s ease;
+        }
+
+        .meeting-card:hover {
+            border-color: #64748b;
+            transform: translateY(-2px);
+        }
+
+        .meeting-card h3 {
+            margin: 0 0 8px 0;
+            color: #f8fafc;
+            font-size: 17px;
+        }
+
+        .meeting-card p {
+            margin: 5px 0;
+            color: #cbd5e1;
+            font-size: 14px;
+        }
+
+        .meeting-card button {
+            background: #2563eb;
+            color: white;
+
+            border: none;
+            border-radius: 8px;
+
+            padding: 10px 16px;
+
+            font-size: 14px;
+            font-weight: 600;
+
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .meeting-card button:hover {
+            background: #1d4ed8;
+        }
+    </style>
 </head>
 
 <body>
@@ -25,6 +103,20 @@
 
 
     <main class="container">
+
+
+        <!-- Meeting History -->
+        <section class="meeting-history">
+
+            <div class="section-title">
+                <h2>📋 Meeting History</h2>
+            </div>
+
+            <div id="meetingHistory">
+                <p>Loading meeting history...</p>
+            </div>
+
+        </section>
 
         <!-- Participants -->
         <section class="participants-section">
@@ -146,7 +238,15 @@
     </main>
 
 
+
+
     <script src="js/meeting.js"></script>
 
+
+    <script>
+        loadMeetingHistory();
+    </script>
+
 </body>
+
 </html>
