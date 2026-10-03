@@ -1231,3 +1231,123 @@ function leaveFromMenu() {
     leaveMeeting();
 
 }
+
+
+let systemAudioActive = false;
+
+function toggleSystemAudio() {
+
+    if (!window.pywebview || !pywebview.api) {
+        console.error("pywebview API not available");
+        return;
+    }
+
+    if (!systemAudioActive) {
+
+        pywebview.api.start_system_audio()
+            .then((result) => {
+
+                console.log("System audio:", result);
+
+                if (result && result.started) {
+                    systemAudioActive = true;
+
+                    const button =
+                        document.getElementById("systemAudioButton");
+
+                    if (button) {
+                        button.textContent = "⏹";
+                        button.title = "Stop Meeting Audio";
+                    }
+                }
+
+            })
+            .catch((error) => {
+                console.error(
+                    "System audio start error:",
+                    error
+                );
+            });
+
+    } else {
+
+        pywebview.api.stop_system_audio()
+            .then((result) => {
+
+                console.log("System audio:", result);
+
+                systemAudioActive = false;
+
+                const button =
+                    document.getElementById("systemAudioButton");
+
+                if (button) {
+                    button.textContent = "🎧";
+                    button.title = "Start Meeting Audio";
+                }
+
+            })
+            .catch((error) => {
+                console.error(
+                    "System audio stop error:",
+                    error
+                );
+            });
+    }
+}
+
+
+function receiveSystemAudioTranscript(text) {
+
+    console.log("🎧 Meeting Audio:", text);
+
+    if (!text) {
+        return;
+    }
+
+    const messages =
+        document.getElementById("messages");
+
+    if (!messages) {
+        console.error(
+            "Transcript container #messages not found."
+        );
+        return;
+    }
+
+    const message =
+        document.createElement("div");
+
+    message.className =
+        "message system-audio-message";
+
+    message.innerHTML = `
+        <strong>🎧 Meeting:</strong>
+        <p>${escapeHtml(text)}</p>
+    `;
+
+    messages.appendChild(message);
+
+    messages.scrollTop =
+        messages.scrollHeight;
+}
+
+
+function setSystemAudioStatus(state, message) {
+
+    console.log(
+        "System audio status:",
+        state,
+        message
+    );
+}
+
+
+function escapeHtml(text) {
+
+    const div = document.createElement("div");
+
+    div.textContent = text;
+
+    return div.innerHTML;
+}

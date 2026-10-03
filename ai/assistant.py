@@ -1,210 +1,758 @@
-"""AI analysis with safe fallbacks for the meeting assistant."""
+"""AI analysis for the authorized AI Meeting Companion."""
+
 import os
+import time
+import json
+import re
 from dotenv import load_dotenv
+from google.genai import types
+
 
 load_dotenv()
+# ---------------------------------------------------------
+# Persistent Gemini Quota Lock
+# ---------------------------------------------------------
+
+QUOTA_LOCK_FILE = "database/gemini_quota_lock.json"
+
+
+def is_gemini_quota_locked():
+    if not os.path.exists(QUOTA_LOCK_FILE):
+        return False
+
+    try:
+        with open(QUOTA_LOCK_FILE, "r") as file:
+            data = json.load(file)
+
+        locked_until = data.get("locked_until", 0)
+
+        if time.time() < locked_until:
+            remaining = int(locked_until - time.time())
+
+            print(
+                f"Gemini quota locked. "
+                f"Approx {remaining // 60} minutes remaining."
+            )
+
+            return True
+
+        # Lock expired
+        os.remove(QUOTA_LOCK_FILE)
+
+        print("Gemini quota lock expired.")
+
+        return False
+
+    except Exception as error:
+        print(f"Quota lock read error: {error}")
+        return False
+
+
+def lock_gemini_quota(error_text):
+    # Default: 24 hours
+    wait_seconds = 24 * 60 * 60
+
+    # Try to read Google's retry delay
+    match = re.search(
+        r"retryDelay.*?(\d+)s",
+        error_text
+    )
+
+    if match:
+        wait_seconds = int(match.group(1))
+
+    locked_until = time.time() + wait_seconds
+
+    try:
+        os.makedirs(
+            os.path.dirname(QUOTA_LOCK_FILE),
+            exist_ok=True
+        )
+
+        with open(
+            QUOTA_LOCK_FILE,
+            "w"
+        ) as file:
+
+            json.dump(
+                {
+                    "locked_until": locked_until,
+                    "wait_seconds": wait_seconds
+                },
+                file,
+                indent=4
+            )
+
+        print(
+            f"Gemini quota locked for "
+            f"{wait_seconds // 60} minutes."
+        )
+
+    except Exception as error:
+        print(
+            f"Quota lock save error: {error}"
+        )
+
 MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+
 _client = None
+
+# Prevent unnecessary Gemini requests
+_last_ai_request_time = 0
+AI_COOLDOWN_SECONDS = 15
+
+# Prevent repeated questions from consuming quota
+_recent_questions = {}
+DUPLICATE_WINDOW_SECONDS = 30
+
+gemini_quota_blocked = False
+
+# ---------------------------------------------------------
+# Gemini Client
+# ---------------------------------------------------------
 
 def _get_client():
     global _client
+
     if _client is not None:
         return _client
+
     api_key = os.getenv("GEMINI_API_KEY")
+
     if not api_key:
+        print("Gemini API key not found.")
         return None
+
     try:
         from google import genai
+
         _client = genai.Client(api_key=api_key)
+
+        print("Gemini client initialized.")
+
         return _client
+
     except Exception as error:
         print(f"Gemini client unavailable: {error}")
         return None
 
+
+# ---------------------------------------------------------
+# Local Question Detection
+# ---------------------------------------------------------
+
 def detect_question_locally(message):
-    words = message.lower().strip().split()
-    return bool("?" in message or (words and words[0] in {"what", "why", "how", "when", "where", "who", "which", "can", "could", "would", "should", "is", "are", "do", "does", "will"}))
+    text = message.lower().strip()
+
+    if "?" in text:
+        return True
+
+    question_words = {
+        "what",
+        "why",
+        "how",
+        "when",
+        "where",
+        "who",
+        "which",
+        "can",
+        "could",
+        "would",
+        "should",
+        "is",
+        "are",
+        "do",
+        "does",
+        "did",
+        "will",
+        "shall"
+    }
+
+    words = text.split()
+
+    if words and words[0] in question_words:
+        return True
+
+    return False
+
+
+# ---------------------------------------------------------
+# Local Topic Detection
+# ---------------------------------------------------------
 
 def detect_topic_locally(message):
-    topics = {"Project": ("project", "development", "feature", "module"), "Programming": ("python", "java", "code", "programming", "api", "database"), "Meeting": ("meeting", "discussion", "agenda"), "Schedule": ("schedule", "time", "deadline", "tomorrow", "today"), "Task": ("task", "work", "assignment", "responsibility"), "Problem": ("problem", "issue", "error", "bug")}
     text = message.lower()
-    return next((topic for topic, words in topics.items() if any(word in text for word in words)), "General Discussion")
+
+    topics = {
+        "Programming": (
+            "python",
+            "java",
+            "javascript",
+            "code",
+            "programming",
+            "api",
+            "database",
+            "software"
+        ),
+
+        "Project": (
+            "project",
+            "development",
+            "feature",
+            "module",
+            "system"
+        ),
+
+        "Meeting": (
+            "meeting",
+            "discussion",
+            "agenda",
+            "discussion"
+        ),
+
+        "Schedule": (
+            "schedule",
+            "time",
+            "deadline",
+            "tomorrow",
+            "today"
+        ),
+
+        "Task": (
+            "task",
+            "work",
+            "assignment",
+            "responsibility"
+        ),
+
+        "Problem": (
+            "problem",
+            "issue",
+            "error",
+            "bug",
+            "failed",
+            "failure"
+        )
+    }
+
+    for topic, keywords in topics.items():
+
+        for keyword in keywords:
+
+            if keyword in text:
+                return topic
+
+    return "General Discussion"
+
+
+# ---------------------------------------------------------
+# Helper
+# ---------------------------------------------------------
 
 def _field(text, label, default):
+
     for line in text.splitlines():
-        if line.strip().lower().startswith(f"{label.lower()}:"):
-            return line.split(":", 1)[1].strip() or default
+
+        if line.strip().lower().startswith(
+            f"{label.lower()}:"
+        ):
+
+            value = line.split(":", 1)[1].strip()
+
+            if value:
+                return value
+
     return default
 
+
+# ---------------------------------------------------------
+# Temporary AI Unavailable
+# ---------------------------------------------------------
+
 def _unavailable_analysis(is_question, topic):
-    return {"is_question": is_question, "topic": topic, "answer": "AI answer temporarily unavailable. Please try again." if is_question else "Not a question.", "suggestion": "AI analysis is temporarily unavailable. The meeting transcript is still being saved."}
+
+    return {
+        "is_question": is_question,
+        "topic": topic,
+        "answer": (
+            "AI answer is temporarily unavailable. "
+            "Please try again later."
+            if is_question
+            else "Not a question."
+        ),
+        "suggestion": (
+            "Continue the meeting discussion. "
+            "The transcript is still being saved."
+        )
+    }
+
+
+# ---------------------------------------------------------
+# Check Duplicate Question
+# ---------------------------------------------------------
+
+def _is_duplicate_question(message):
+
+    now = time.time()
+
+    key = message.lower().strip()
+
+    # Remove old entries
+    expired = [
+        question
+        for question, timestamp in _recent_questions.items()
+        if now - timestamp > DUPLICATE_WINDOW_SECONDS
+    ]
+
+    for question in expired:
+        del _recent_questions[question]
+
+    # Check duplicate
+    if key in _recent_questions:
+
+        print("Duplicate question ignored:", message)
+
+        return True
+
+    _recent_questions[key] = now
+
+    return False
+
+
+# ---------------------------------------------------------
+# AI Analysis
+# ---------------------------------------------------------
 
 def analyze_message(message):
+
+    global _last_ai_request_time
 
     message = message.strip()
 
     if not message:
+
         return {
             "is_question": False,
             "topic": "General Discussion",
-            "answer": "",
-            "suggestion": "Please enter a meeting message."
+            "suggestion": "Please enter a meeting message.",
+            "answer": ""
         }
 
-    # Local detection is always available
-    local_question = detect_question_locally(message)
-    local_topic = detect_topic_locally(message)
+    # ---------------------------------------------
+    # Local analysis first
+    # ---------------------------------------------
+
+    is_question = detect_question_locally(message)
+
+    topic = detect_topic_locally(message)
+
+    # ---------------------------------------------
+    # Normal message → NO Gemini request
+    # ---------------------------------------------
+
+    if not is_question:
+
+        return {
+            "is_question": False,
+            "topic": topic,
+            "answer": "Not a question.",
+            "suggestion": (
+                "Continue the discussion and "
+                "capture important points."
+            )
+        }
+
+    # ---------------------------------------------
+    # Duplicate question protection
+    # ---------------------------------------------
+
+    if _is_duplicate_question(message):
+
+        return {
+            "is_question": True,
+            "topic": topic,
+            "answer": "This question was already analyzed.",
+            "suggestion": "Continue with the meeting discussion."
+        }
+
+    # ---------------------------------------------
+    # Cooldown protection
+    # ---------------------------------------------
+
+    now = time.time()
+
+    if now - _last_ai_request_time < AI_COOLDOWN_SECONDS:
+
+        remaining = int(
+            AI_COOLDOWN_SECONDS -
+            (now - _last_ai_request_time)
+        )
+
+        print(
+            f"AI cooldown active. "
+            f"Wait {remaining}s."
+        )
+
+        return {
+            "is_question": True,
+            "topic": topic,
+            "answer": (
+                "AI is processing another question. "
+                "Please wait a few seconds."
+            ),
+            "suggestion": (
+                "Continue the discussion while "
+                "the AI becomes available."
+            )
+        }
+
+    # ---------------------------------------------
+    # Gemini quota already exhausted
+    # ---------------------------------------------
+
+    global gemini_quota_blocked
+
+    if gemini_quota_blocked:
+
+        print("Gemini quota is locked. Skipping API request.")
+
+        return {
+            "is_question": True,
+            "topic": topic,
+            "answer": (
+                "Gemini API quota is currently exhausted. "
+                "Please try again after the quota resets."
+            ),
+            "suggestion": (
+                "Your meeting transcript is still being saved."
+            )
+        }
+
+    if is_gemini_quota_locked():
+
+        return {
+            "is_question": True,
+            "topic": topic,
+            "answer": (
+                "Gemini API quota is currently exhausted. "
+                "Please try again after the quota resets."
+            ),
+            "suggestion": (
+                "The meeting transcript is still being saved."
+            )
+        }
+
+    # ---------------------------------------------
+    # Gemini Client
+    # ---------------------------------------------
 
     client = _get_client()
 
     if client is None:
+
         return _unavailable_analysis(
-            local_question,
-            local_topic
+            is_question,
+            topic
         )
 
+    # ---------------------------------------------
+    # Gemini Prompt
+    # ---------------------------------------------
+
     prompt = f"""
-You are an AI Meeting Assistant analyzing an authorized live meeting.
+You are an AI Meeting Assistant for an authorized live meeting.
 
-Analyze this meeting message:
+Analyze the following meeting question.
 
-"{message}"
+Return exactly these four lines:
 
-Return exactly four lines:
-
-Question: Yes or No
-Topic: short specific topic in 2 to 5 words
-Answer: direct useful answer, or Not a question.
+Question: Yes
+Topic: a short specific topic in 2 to 5 words
+Answer: direct and useful answer to the question
 Suggestion: one concise practical suggestion
 
 Rules:
-- Detect the topic from the actual meaning.
-- Do not use a fixed topic list.
-- Keep the topic specific and short.
+
 - Answer the actual question.
+- Detect the topic from the meaning of the question.
+- Do not use a fixed topic list.
+- Keep the topic between 2 and 5 words.
 - Do not invent information.
-- If it is not a question, write "Not a question."
+- If the question needs context, clearly mention that.
+- Keep the answer concise and useful.
+
+Meeting question:
+
+{message}
 """
 
-    # Try Gemini up to 3 times
-    for attempt in range(3):
+    # ---------------------------------------------
+    # ONE Gemini request only
+    # ---------------------------------------------
 
-        try:
+    try:
+
+        _last_ai_request_time = time.time()
+
+        print(
+            "Gemini request:",
+            message
+        )
+
+        response = client.models.generate_content(
+            model=MODEL_NAME,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                    disable=True
+                )
+            )
+        )
+
+        text = (response.text or "").strip()
+
+        result = {
+            "is_question": True,
+
+            "topic": _field(
+                text,
+                "Topic",
+                topic
+            ),
+
+            "answer": _field(
+                text,
+                "Answer",
+                "No answer generated."
+            ),
+
+            "suggestion": _field(
+                text,
+                "Suggestion",
+                "Continue the discussion."
+            )
+        }
+
+        print(
+            "Gemini result:",
+            result
+        )
+
+        return result
+
+    # ---------------------------------------------
+    # Quota / API Errors
+    # ---------------------------------------------
+
+    except Exception as error:
+
+        error_text = str(error)
+
+        print(
+            "Gemini AI Error:",
+            error_text
+        )
+
+        # 429 = quota/rate limit
+        if "429" in error_text or "RESOURCE_EXHAUSTED" in error_text:
+
+            lock_gemini_quota(error_text)
 
             print(
-                f"Gemini analysis attempt "
-                f"{attempt + 1}/3: {message}"
+                "Gemini quota exceeded. "
+                "Persistent quota lock enabled."
             )
+
+            return {
+                "is_question": True,
+                "topic": topic,
+                "answer": (
+                    "Gemini API quota is currently exhausted. "
+                    "Please try again after the quota resets."
+                ),
+                "suggestion": (
+                    "The meeting transcript is still being saved."
+                )
+            }
+
+        # 503 = temporary service problem
+        if "503" in error_text or "UNAVAILABLE" in error_text:
+
+            return {
+                "is_question": True,
+                "topic": topic,
+                "answer": (
+                    "Gemini is temporarily unavailable. "
+                    "Please try again later."
+                ),
+                "suggestion": (
+                    "Continue the meeting while "
+                    "the AI service recovers."
+                )
+            }
+
+        # Other errors
+        return {
+            "is_question": True,
+            "topic": topic,
+            "answer": (
+                "AI answer is temporarily unavailable."
+            ),
+            "suggestion": (
+                "The transcript is still being saved."
+            )
+        }
+
+
+# ---------------------------------------------------------
+# Meeting Summary
+# ---------------------------------------------------------
+
+def generate_meeting_summary(
+    transcript,
+    title="AI Meeting Assistant",
+    participants=None
+):
+
+    participants = participants or []
+
+    client = _get_client()
+
+    if transcript.strip() and client is not None:
+
+        prompt = f"""
+Summarize this authorized meeting transcript.
+
+Return these sections:
+
+Meeting Title
+Date/Time
+Participants
+Short Summary
+Key Points
+Decisions
+Action Items
+Important Questions Discussed
+
+Be concise and factual.
+
+Transcript:
+
+{transcript}
+"""
+
+        try:
 
             response = client.models.generate_content(
                 model=MODEL_NAME,
                 contents=prompt
             )
 
-            text = (response.text or "").strip()
-
-            if not text:
-                raise ValueError(
-                    "Gemini returned an empty response."
-                )
-
-            result = {
-                "is_question": _field(
-                    text,
-                    "Question",
-                    "No"
-                ).lower().startswith("yes"),
-
-                "topic": _field(
-                    text,
-                    "Topic",
-                    local_topic
-                ),
-
-                "answer": _field(
-                    text,
-                    "Answer",
-                    "No answer generated."
-                ),
-
-                "suggestion": _field(
-                    text,
-                    "Suggestion",
-                    "Continue the discussion."
-                )
-            }
-
-            print("Gemini result:", result)
-
-            return result
+            return (
+                response.text or ""
+            ).strip()
 
         except Exception as error:
 
             print(
-                f"Gemini AI Error "
-                f"(attempt {attempt + 1}/3): {error}"
+                f"Gemini Summary Error: {error}"
             )
 
-            # Wait before retrying
-            import time
-            time.sleep(1.5)
-
-    # All attempts failed
-    print("Gemini failed after 3 attempts.")
-
-    return _unavailable_analysis(
-        local_question,
-        local_topic
+    return _local_summary(
+        transcript,
+        title,
+        participants
     )
 
-    prompt = f'''You are an AI Meeting Assistant analyzing an authorized live meeting.
 
-Analyze the following meeting message.
+# ---------------------------------------------------------
+# Local Summary
+# ---------------------------------------------------------
 
-Return exactly these four lines:
+def _local_summary(
+    transcript,
+    title,
+    participants
+):
 
-Question: Yes or No
-Topic: a short specific topic in 2 to 5 words
-Answer: if it is a question, give a direct and useful answer; otherwise write Not a question.
-Suggestion: one concise practical suggestion related to the discussion.
+    lines = [
+        line.strip()
+        for line in transcript.splitlines()
+        if line.strip()
+    ]
 
-Rules:
-- Detect the topic from the actual meaning of the message.
-- Do not use a fixed topic list.
-- Do not always return "General Discussion".
-- Make the topic specific when possible.
-- If the message is about multiple things, choose the main topic.
-- Keep the topic short.
-- Answer the actual question when there is one.
-- Do not invent information.
+    messages = [
+        line.split(":", 1)[-1].strip()
+        for line in lines
+    ]
 
-Message:
-{message}
-'''
-    try:
-        response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
-        text = (response.text or "").strip()
-        return {"is_question": _field(text, "Question", "No").lower().startswith("yes"), "topic": _field(text, "Topic", topic), "answer": _field(text, "Answer", "No answer generated."), "suggestion": _field(text, "Suggestion", "Continue the discussion.")}
-    except Exception as error:
-        print(f"Gemini AI Error: {error}")
-        return _unavailable_analysis(is_question, topic)
+    questions = [
+        item
+        for item in messages
+        if detect_question_locally(item)
+    ][:5]
 
-def generate_meeting_summary(transcript, title="AI Meeting Assistant", participants=None):
-    participants = participants or []
-    client = _get_client()
-    if transcript.strip() and client is not None:
-        prompt = f'''Summarize this authorized meeting transcript. Return sections exactly named: Meeting Title, Date/Time, Participants, Short Summary, Key Points, Decisions, Action Items, Important Questions Discussed. Be concise.\n\nTranscript:\n{transcript}'''
-        try:
-            return (client.models.generate_content(model=MODEL_NAME, contents=prompt).text or "").strip()
-        except Exception as error:
-            print(f"Gemini Summary Error: {error}")
-    return "[Basic transcript-based summary; AI generation was unavailable.]\n\n" + _local_summary(transcript, title, participants)
+    actions = [
+        item
+        for item in messages
+        if any(
+            term in item.lower()
+            for term in (
+                "will ",
+                "need to",
+                "assigned",
+                "action item",
+                "task"
+            )
+        )
+    ][:5]
 
-def _local_summary(transcript, title, participants):
-    lines = [line.strip() for line in transcript.splitlines() if line.strip()]
-    messages = [line.split(":", 1)[-1].strip() for line in lines]
-    questions = [item for item in messages if detect_question_locally(item)][:5]
-    actions = [item for item in messages if any(term in item.lower() for term in ("will ", "need to", "assigned", "action item", "task"))][:5]
-    decisions = [item for item in messages if any(term in item.lower() for term in ("decided", "agreed", "final decision", "will use"))][:5]
-    def bullets(items, empty): return "\n".join(f"- {item}" for item in items) if items else f"- {empty}"
-    return f'''Meeting Title\n{title}\n\nDate/Time\nGenerated from the stored transcript\n\nParticipants\n{", ".join(participants) or "No participants recorded"}\n\nShort Summary\n{len(messages)} transcript message(s) were recorded.\n\nKey Points\n{bullets(messages[:5], "No key points detected.")}\n\nDecisions\n{bullets(decisions, "No decisions detected.")}\n\nAction Items\n{bullets(actions, "No action items detected.")}\n\nImportant Questions Discussed\n{bullets(questions, "No questions detected.")}'''
+    decisions = [
+        item
+        for item in messages
+        if any(
+            term in item.lower()
+            for term in (
+                "decided",
+                "agreed",
+                "final decision",
+                "will use"
+            )
+        )
+    ][:5]
+
+    def bullets(items, empty):
+
+        if items:
+            return "\n".join(
+                f"- {item}"
+                for item in items
+            )
+
+        return f"- {empty}"
+
+    return f"""
+Meeting Title
+{title}
+
+Date/Time
+Generated from the stored transcript
+
+Participants
+{", ".join(participants) or "No participants recorded"}
+
+Short Summary
+{len(messages)} transcript message(s) were recorded.
+
+Key Points
+{bullets(messages[:5], "No key points detected.")}
+
+Decisions
+{bullets(decisions, "No decisions detected.")}
+
+Action Items
+{bullets(actions, "No action items detected.")}
+
+Important Questions Discussed
+{bullets(questions, "No questions detected.")}
+"""
