@@ -4,7 +4,7 @@ import numpy as np
 import time
 
 
-DEVICE = 17
+DEVICE = 177
 SAMPLE_RATE = 48000
 CHUNK_SECONDS = 5
 
