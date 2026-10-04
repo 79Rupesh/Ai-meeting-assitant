@@ -1296,17 +1296,15 @@ function toggleSystemAudio() {
     }
 }
 
+function receiveSystemAudioTranscript(speaker, text) {
 
-function receiveSystemAudioTranscript(text) {
-
-    console.log("🎧 Meeting Audio:", text);
+    console.log("🎧", speaker, text);
 
     if (!text) {
         return;
     }
 
-    const messages =
-        document.getElementById("messages");
+    const messages = document.getElementById("messages");
 
     if (!messages) {
         console.error(
@@ -1315,14 +1313,13 @@ function receiveSystemAudioTranscript(text) {
         return;
     }
 
-    const message =
-        document.createElement("div");
+    const message = document.createElement("div");
 
     message.className =
         "message system-audio-message";
 
     message.innerHTML = `
-        <strong>🎧 Meeting:</strong>
+        <strong>🎧 ${escapeHtml(speaker)}</strong>
         <p>${escapeHtml(text)}</p>
     `;
 

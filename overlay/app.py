@@ -81,15 +81,15 @@ class API:
     # SYSTEM AUDIO
     # -----------------------------
 
-    def _send_system_text(self, text):
-
-        print("🎧 Meeting Audio:", text)
+    def _send_system_text(self, speaker, text):
+        print(f"🎧 {speaker}: {text}")
 
         self._call_page(
             "receiveSystemAudioTranscript",
+            speaker,
             text
         )
-
+        
     def _set_system_status(self, state, message):
 
         self._call_page(
